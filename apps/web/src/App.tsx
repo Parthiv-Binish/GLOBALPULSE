@@ -27,6 +27,9 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [profileName, setProfileName] = useState('');
   const [authMessage, setAuthMessage] = useState('');
   const [authError, setAuthError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -46,7 +49,10 @@ export default function App() {
   useEffect(() => {
     if (!supabase) { setAuthReady(true); return; }
     supabase.auth.getSession().then(({data}) => { setSession(data.session); setAuthReady(true); });
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
+    const { data } = supabase.auth.onAuthStateChange((event, next) => {
+      setSession(next);
+      if (event === 'PASSWORD_RECOVERY') setPasswordRecovery(true);
+    });
     return () => data.subscription.unsubscribe();
   }, []);
 
@@ -55,7 +61,10 @@ export default function App() {
     async function loadProfile() {
       if (!supabase || !session?.user) { setProfile(null); return; }
       const {data,error} = await supabase.from('profiles').select('id,display_name,role').eq('id',session.user.id).single();
-      if (active) setProfile(error ? null : data as Profile);
+      if (active) {
+        setProfile(error ? null : data as Profile);
+        if (!error) setProfileName(data.display_name || '');
+      }
     }
     void loadProfile();
     return () => { active = false; };
@@ -112,7 +121,36 @@ export default function App() {
     finally { setBusy(false); }
   };
 
-  const signOut = async () => { await supabase?.auth.signOut(); setPage('overview'); };
+  const signOut = async () => { await supabase?.auth.signOut(); setPasswordRecovery(false); setPage('overview'); };
+
+  const saveProfile = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase || !session?.user) return;
+    const {error} = await supabase.from('profiles').update({display_name:profileName.trim()}).eq('id',session.user.id);
+    if (error) setAuthError(error.message);
+    else { setProfile({...profile!,display_name:profileName.trim()}); setAuthMessage('Profile updated.'); }
+  };
+
+  const deleteOwnAccount = async () => {
+    if (!supabase || !session) return;
+    const confirmed = window.confirm('Permanently delete your GLOBALPULSE account and subscriptions? This cannot be undone.');
+    if (!confirmed) return;
+    setBusy(true);
+    const {error} = await supabase.functions.invoke('delete-account',{method:'POST'});
+    if (error) { setAuthError(error.message || 'Account deletion failed.'); setBusy(false); return; }
+    await supabase.auth.signOut();
+    setSession(null); setProfile(null); setPage('overview'); setBusy(false);
+  };
+
+  const updateRecoveredPassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase || newPassword.length < 8) return;
+    setBusy(true); setAuthError('');
+    const {error} = await supabase.auth.updateUser({password:newPassword});
+    if (error) setAuthError(error.message);
+    else { setPasswordRecovery(false); setNewPassword(''); setAuthMessage('Password updated successfully.'); }
+    setBusy(false);
+  };
   const subscribe = async (providerId: string) => {
     if (!supabase || !session?.user) { setAuthMessage('Sign in to manage alerts.'); return; }
     const exists = subscriptions.find(s => s.provider_id === providerId);
@@ -171,6 +209,13 @@ export default function App() {
 
   if (!authReady) return <div className="boot"><Activity/> Initializing GLOBALPULSE…</div>;
   if (!supabase) return <div className="auth-shell"><div className="auth-card"><Activity/><h1>GLOBALPULSE</h1><p>Authentication configuration is missing.</p><code>VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY</code></div></div>;
+  if (passwordRecovery && session) return <div className="auth-shell"><form className="auth-card" onSubmit={updateRecoveredPassword}>
+    <div className="brand"><Activity/><span>GLOBALPULSE</span></div><small>ACCOUNT SECURITY</small>
+    <h1>Choose a new password</h1><p>Use at least 8 characters. Your password is never visible to GLOBALPULSE administrators.</p>
+    <label>New password<input required minLength={8} type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} placeholder="At least 8 characters"/></label>
+    {authError && <div className="notice error">{authError}</div>}
+    <button className="primary full" disabled={busy}>{busy?'Updating…':'Update password'} <ChevronRight size={16}/></button>
+  </form></div>;
   if (!session) return <div className="auth-shell"><form className="auth-card" onSubmit={submitAuth}>
     <div className="brand"><Activity/><span>GLOBALPULSE</span></div><small>INFRASTRUCTURE INTELLIGENCE</small>
     <h1>{authMode==='signup'?'Create your account':authMode==='reset'?'Reset password':'Welcome back'}</h1>
@@ -225,7 +270,7 @@ export default function App() {
         {providers.length===0?<div className="empty"><Globe2/><b>Provider registry is empty</b><p>Add a real provider source to begin monitoring.</p></div>:providers.map(p=><div className="provider-row" key={p.id}><Globe2/><div><b>{p.name}</b><small>{p.category} · {p.status_url}</small></div><span className={'pill '+(p.enabled?'good':'muted')}>{p.enabled?'Enabled':'Disabled'}</span><button className="secondary" onClick={()=>void toggleProvider(p)}>{p.enabled?'Disable':'Enable'}</button><button className="danger-icon" onClick={()=>void deleteProvider(p)} title="Delete provider"><Trash2 size={15}/></button></div>)}
         <div className="integrity"><ShieldCheck/><p><b>Admin access is protected by database RLS.</b><br/>Your account must be explicitly promoted to admin by the project owner. User accounts cannot promote themselves.</p></div>
       </section>}
-      {page==='account' && <section className="panel account-panel"><div className="panelhead"><div><small>IDENTITY & ACCESS</small><h3>Account profile</h3></div></div><div className="account-detail"><CircleUserRound/><div><b>{profile?.display_name || 'GLOBALPULSE user'}</b><small>{session.user.email}</small><small>Role: {profile?.role || 'user'}</small></div></div><div className="panel-intro">Account authentication is managed by Supabase Auth. Password reset is available from the sign-in screen.</div><button className="secondary" onClick={()=>void signOut()}><LogOut size={15}/> Sign out</button></section>}
+      {page==='account' && <section className="panel account-panel"><div className="panelhead"><div><small>IDENTITY & ACCESS</small><h3>Account profile</h3></div></div><div className="account-detail"><CircleUserRound/><div><b>{profile?.display_name || 'GLOBALPULSE user'}</b><small>{session.user.email}</small><small>Role: {profile?.role || 'user'}</small></div></div><form className="profile-form" onSubmit={saveProfile}><label>Display name<input value={profileName} onChange={e=>setProfileName(e.target.value)} maxLength={80} placeholder="Your display name"/></label><button className="secondary">Save profile</button></form>{authMessage && <div className="notice">{authMessage}</div>}{authError && <div className="notice error">{authError}</div>}<div className="panel-intro">Your account is managed by Supabase Auth. Password reset is available from the sign-in screen. Account deletion removes your authentication profile and subscriptions.</div><div className="account-actions"><button className="secondary" onClick={()=>void signOut()}><LogOut size={15}/> Sign out</button><button className="danger" disabled={busy} onClick={()=>void deleteOwnAccount()}><Trash2 size={15}/> Delete account</button></div></section>}
       <footer>© {new Date().getFullYear()} GLOBALPULSE · SOURCE-ATTRIBUTED INFRASTRUCTURE INTELLIGENCE</footer>
     </main>
   </div>;
