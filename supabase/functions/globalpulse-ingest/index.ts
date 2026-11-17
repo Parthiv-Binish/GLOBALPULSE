@@ -108,7 +108,7 @@ Deno.serve(async (req) => {
       .from("providers")
       .select("id,name,status_url,integration_type")
       .eq("enabled", true)
-      .eq("integration_type", "statuspage");
+      .in("integration_type", ["statuspage", "rss"]);
     if (providerError) throw providerError;
 
     for (const provider of providers ?? []) {
