@@ -40,22 +40,22 @@ function normalize(doc: any) {
 
 
 function xmlText(value: string) {
-  return value.replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, "$1")
+  return value.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
 }
 function xmlTag(block: string, name: string) {
-  const match = block.match(new RegExp("<" + name + "(?:\\\\s[^>]*)?>([\\\\s\\S]*?)</" + name + ">", "i"));
+  const match = block.match(new RegExp("<" + name + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + name + ">", "i"));
   return match ? xmlText(match[1]).trim() : "";
 }
 function normalizeFeed(xml: string) {
-  const entries = xml.match(/<(?:item|entry)\\b[\\s\\S]*?<\\/(?:item|entry)>/gi) ?? [];
+  const entries = xml.match(/<(?:item|entry)\b[\s\S]*?<\/(?:item|entry)>/gi) ?? [];
   const incidents = entries.map((item) => {
     const title = xmlTag(item, "title") || "Provider status update";
     const description = xmlTag(item, "description") || xmlTag(item, "summary") || xmlTag(item, "content");
     const body = (title + " " + description).toLowerCase();
     const id = xmlTag(item, "guid") || xmlTag(item, "id");
-    const href = item.match(/<link\\b[^>]*href=["']([^"']+)["'][^>]*\\/?\\s*>/i)?.[1];
+    const href = item.match(/<link\b[^>]*href=["']([^"']+)["'][^>]*\/?\s*>/i)?.[1];
     const link = href || xmlTag(item, "link") || null;
     const dateValue = xmlTag(item, "pubDate") || xmlTag(item, "updated") ||
       xmlTag(item, "published") || new Date().toISOString();
