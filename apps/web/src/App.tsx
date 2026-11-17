@@ -179,9 +179,9 @@ export default function App() {
     if (!parsed || parsed.protocol !== 'https:' || !parsed.hostname.includes('.') || parsed.username || parsed.password || parsed.port) {
       setFormError('Enter a valid public HTTPS status page URL without credentials or a custom port.'); return;
     }
-    const approvedHosts = ['www.cloudflarestatus.com','www.githubstatus.com','status.atlassian.com','status.digitalocean.com','status.twilio.com'];
+    const approvedHosts = ['www.cloudflarestatus.com','www.githubstatus.com','status.atlassian.com','status.digitalocean.com','status.twilio.com','status.openai.com','discordstatus.com','www.zoomstatus.com','status.mongodb.com','status.supabase.com','www.netlifystatus.com','www.akamaistatus.com','status.npmjs.org','status.newrelic.com'];
     if (!approvedHosts.includes(parsed.hostname) || parsed.pathname !== '/' || parsed.search || parsed.hash) {
-      setFormError('This release accepts only verified official source hosts: Cloudflare, GitHub, Atlassian, DigitalOcean and Twilio.'); return;
+      setFormError('Use an approved official status source host. New integrations require source verification and an application update.'); return;
     }
     const slug = safeSlug(providerForm.name);
     if (!providerForm.name.trim() || !slug || !providerForm.category.trim()) { setFormError('Complete all required fields.'); return; }
