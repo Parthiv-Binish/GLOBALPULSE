@@ -3,7 +3,7 @@ from datetime import datetime,timezone
 import httpx
 from fastapi import FastAPI,HTTPException,Query
 from fastapi.middleware.cors import CORSMiddleware
-URL=os.getenv('SUPABASE_URL','').rstrip('/');KEY=os.getenv('SUPABASE_SERVICE_ROLE_KEY','')
+URL=os.getenv('SUPABASE_URL','').rstrip('/');KEY=os.getenv('SUPABASE_ANON_KEY','')
 app=FastAPI(title='GlobalPulse API',version='1.0.0')
 app.add_middleware(CORSMiddleware,allow_origins=[x.strip() for x in os.getenv('CORS_ORIGINS','http://localhost:5173').split(',')],allow_methods=['GET'],allow_headers=['*'])
 async def read(table,params):
