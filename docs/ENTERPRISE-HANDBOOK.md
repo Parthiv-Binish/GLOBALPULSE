@@ -74,5 +74,10 @@ Daily review: API health, worker logs, last successful ingestion, provider failu
 - Backup, rollback, support contact and privacy pages are ready.
 - QA, Security and Operations sign-off is recorded.
 
-## 13. Current baseline and known gaps
-The initial code baseline provides the dashboard, read API, Statuspage ingestion worker and database schema. Admin provider onboarding, full auth screens, notification delivery, RSS/vendor-specific connectors, advanced rate limiting and comprehensive audit logging remain planned. The first live provider must be registered by an authorized operator; no provider inventory is seeded.
+## 13. Current delivery status (17 November 2026)
+- **Delivered:** React dashboard, live incident feed, provider directory, search, Supabase signup/sign-in/password reset, profile editing, account deletion, personal provider watchlists, admin provider onboarding, enable/disable/delete controls, and administrator audit-log viewer.
+- **Delivered:** five verified official Statuspage sources (Cloudflare, GitHub, Atlassian, DigitalOcean, Twilio), OIDC-authenticated six-hour ingestion, Postgres RLS, admin role controls, Vercel production deployment, Render API deployment, and GitHub CI.
+- **Verified:** first populated ingestion completed successfully for five providers; seven provider-originated incidents were stored at the first verification snapshot. Provider status values and incident counts are dynamic and will change with the source feeds.
+- **Owner action required:** create and confirm the owner account, then promote it using `docs/ADMIN-BOOTSTRAP.md`. Configure Supabase Auth Site URL and Redirect URLs for the production Vercel domain in the Supabase dashboard.
+- **Still deferred:** outbound email/SMS/push delivery, RSS and vendor-specific connectors, enterprise multi-tenancy, independent uptime probes, comprehensive load/penetration testing, formal backup/restore rehearsal, and a legally reviewed privacy/grievance notice.
+- **Launch gate:** complete the owner bootstrap, set the Auth redirect allowlist, replace privacy notice placeholders, and complete an independent security and operational review before representing the service as enterprise production-ready. The first live provider must be registered by an authorized operator; no provider inventory is seeded.
