@@ -34,6 +34,8 @@ const fmt=(value:string|null)=>value?new Date(value).toLocaleString():'Not check
 
 export default function GlobalMap({providers,incidents}:{providers:Provider[];incidents:Incident[]}) {
   const globeRef=useRef<any>(null);
+  const canvasHostRef=useRef<HTMLDivElement|null>(null);
+  const [canvasWidth,setCanvasWidth]=useState(0);
   const [selected,setSelected]=useState<Provider|null>(null);
   const mapped=useMemo(()=>providers.flatMap(provider=>{
     const geo=GEO[provider.slug];
@@ -41,6 +43,15 @@ export default function GlobalMap({providers,incidents}:{providers:Provider[];in
   }),[providers]);
   const rings=useMemo(()=>mapped.filter(p=>p.current_status && p.current_status!=='none').map(p=>({...p,maxR:2.1,propagationSpeed:1.2,repeatPeriod:1500})),[mapped]);
   const selectedIncidents=selected?incidents.filter(i=>i.provider_id===selected.id):[];
+  useEffect(()=>{
+    const host=canvasHostRef.current;
+    if(!host) return;
+    const measure=()=>setCanvasWidth(Math.floor(host.getBoundingClientRect().width));
+    measure();
+    const observer=new ResizeObserver(measure);
+    observer.observe(host);
+    return ()=>observer.disconnect();
+  },[]);
   useEffect(()=>{
     const controls=globeRef.current?.controls?.();
     if(controls){controls.autoRotate=true;controls.autoRotateSpeed=.32;controls.enableDamping=true;}
@@ -54,8 +65,9 @@ export default function GlobalMap({providers,incidents}:{providers:Provider[];in
   return <div className="global-map-grid">
     <section className="globe-panel">
       <div className="globe-topline"><small>GLOBAL PROVIDER FOOTPRINT · LIVE SOURCE STATUS</small><strong><i className="dot"/> {mapped.length} MAPPED SOURCES</strong></div>
-      <div className="globe-canvas">
-        <Globe ref={globeRef} width={undefined} height={500}
+      <div className="globe-canvas" ref={canvasHostRef}>
+        {canvasWidth>0 && <Globe ref={globeRef} width={canvasWidth} height={500}
+          waitForGlobeReady={false} animateIn={true}
           backgroundColor="rgba(0,0,0,0)"
           globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg"
           bumpImageUrl="https://unpkg.com/three-globe/example/img/earth-topology.png"
@@ -66,7 +78,7 @@ export default function GlobalMap({providers,incidents}:{providers:Provider[];in
           onPointClick={(point:any)=>setSelected(providers.find(p=>p.id===point.id)||null)}
           ringsData={rings} ringLat="lat" ringLng="lng" ringColor={(d:any)=>d.color}
           ringMaxRadius="maxR" ringPropagationSpeed="propagationSpeed" ringRepeatPeriod="repeatPeriod"
-          enablePointerInteraction={true} />
+          enablePointerInteraction={true} />}
       </div>
       <div className="globe-legend">
         <span><i className="legend-dot" style={{background:'#48d9a7'}}/>Operational</span>
