@@ -24,7 +24,7 @@ GLOBALPULSE does not sell account data. Account information is shared with servi
 
 ## Retention and deletion
 
-Provider incident records are retained as operational history. Account profile and subscription data are retained while the account is active. A self-service account deletion workflow is not yet enabled; contact the operator to request account deletion and associated personal-data removal.
+Provider incident records are retained as operational history. Account profile and subscription data are retained while the account is active. A self-service account deletion action is available in Account settings. It permanently deletes the authenticated user and cascades the user's profile and subscriptions. Provider incident records are not deleted because they are public operational source history.
 
 ## Security
 
