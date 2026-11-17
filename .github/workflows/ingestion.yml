@@ -1,6 +1,11 @@
 name: GLOBALPULSE scheduled ingestion
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/ingestion.yml"
+      - "supabase/functions/globalpulse-ingest/**"
   schedule:
     # Six-hour cadence keeps private-repository Actions usage within the free allowance.
     - cron: "0 */6 * * *"
