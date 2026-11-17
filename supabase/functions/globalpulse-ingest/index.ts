@@ -1,5 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
+import { XMLParser } from "npm:fast-xml-parser@4";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -38,6 +39,41 @@ function normalize(doc: any) {
   return { state, incidents };
 }
 
+
+const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+function asArray(value: any) { return value == null ? [] : Array.isArray(value) ? value : [value]; }
+function normalizeFeed(xml: string) {
+  const parsed = xmlParser.parse(xml);
+  const feed = parsed?.rss?.channel ?? parsed?.feed ?? {};
+  const entries = asArray(feed.item ?? feed.entry);
+  const incidents = entries.map((item: any) => {
+    const title = String(item.title?.["#text"] ?? item.title ?? "Provider status update");
+    const description = String(item.description ?? item.summary ?? item.content ?? "");
+    const body = (title + " " + description).toLowerCase();
+    const rawId = item.guid?.["#text"] ?? item.guid ?? item.id ?? item.link?.["@_href"] ?? item.link;
+    const link = item.link?.["@_href"] ?? item.link ?? null;
+    const dateValue = item.pubDate ?? item.updated ?? item.published ?? new Date().toISOString();
+    const parsedDate = new Date(dateValue);
+    const timestamp = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
+    const status = /resolved|closed|restored|completed/.test(body) ? "resolved"
+      : /monitoring|mitigat/.test(body) ? "monitoring"
+      : /identified/.test(body) ? "identified" : "investigating";
+    const impact = /critical/.test(body) ? "critical" : /major|severe/.test(body) ? "major"
+      : /minor|degraded/.test(body) ? "minor" : "unknown";
+    return {
+      source_event_id: String(rawId ?? title + timestamp),
+      title: title.slice(0, 500),
+      status,
+      impact,
+      shortlink: typeof link === "string" ? link : null,
+      source_url: typeof link === "string" ? link : null,
+      created_at: timestamp,
+      updated_at: timestamp,
+    };
+  });
+  return { state: "unknown", incidents };
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") return response({ error: "Method not allowed" }, 405);
 
@@ -70,7 +106,7 @@ Deno.serve(async (req) => {
   try {
     const { data: providers, error: providerError } = await supabase
       .from("providers")
-      .select("id,name,status_url")
+      .select("id,name,status_url,integration_type")
       .eq("enabled", true)
       .eq("integration_type", "statuspage");
     if (providerError) throw providerError;
@@ -78,45 +114,47 @@ Deno.serve(async (req) => {
     for (const provider of providers ?? []) {
       try {
         const source = new URL(provider.status_url);
-        const approvedHosts = new Set([
-          "www.cloudflarestatus.com",
-          "www.githubstatus.com",
-          "status.atlassian.com",
-          "status.digitalocean.com",
-          "status.twilio.com",
-          "status.openai.com",
-          "discordstatus.com",
-          "www.zoomstatus.com",
-          "status.mongodb.com",
-          "status.supabase.com",
-          "www.netlifystatus.com",
-          "www.akamaistatus.com",
-          "status.npmjs.org",
-          "status.newrelic.com",
+        const statuspageHosts = new Set([
+          "www.cloudflarestatus.com","www.githubstatus.com","status.atlassian.com",
+          "status.digitalocean.com","status.twilio.com","status.openai.com",
+          "discordstatus.com","www.zoomstatus.com","status.mongodb.com",
+          "status.supabase.com","www.netlifystatus.com","www.akamaistatus.com",
+          "status.npmjs.org","status.newrelic.com",
         ]);
-        if (
-          source.protocol !== "https:" || !approvedHosts.has(source.hostname) ||
-          source.username || source.password || source.port ||
-          source.pathname !== "/" || source.search || source.hash
-        ) {
-          throw new Error("Provider URL is not an approved official HTTPS status source");
+        const rssFeeds = new Set([
+          "https://status.aws.amazon.com/rss/all.rss",
+          "https://status.cloud.google.com/en/feed.atom",
+          "https://azure.status.microsoft/status/feed/",
+          "https://cloud.ibm.com/status/api/notifications/feed.rss",
+          "https://ocistatus.oraclecloud.com/api/v2/incident-summary.rss",
+        ]);
+        const validSource = provider.integration_type === "statuspage"
+          ? statuspageHosts.has(source.hostname) && source.pathname === "/" && !source.search && !source.hash
+          : provider.integration_type === "rss"
+            ? rssFeeds.has(source.toString())
+            : false;
+        if (source.protocol !== "https:" || source.username || source.password || source.port || !validSource) {
+          throw new Error("Provider URL is not an approved official status source");
         }
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
         let document: any;
         try {
-          const result = await fetch(source.toString().replace(/\/$/, "") + "/api/v2/summary.json", {
+          const endpoint = provider.integration_type === "rss"
+            ? source.toString()
+            : source.toString().replace(/\/$/, "") + "/api/v2/summary.json";
+          const result = await fetch(endpoint, {
             signal: controller.signal,
             redirect: "error",
-            headers: { "accept": "application/json", "user-agent": "GLOBALPULSE/1.0 (+https://github.com/Parthiv-Binish/GLOBALPULSE) status monitor" },
+            headers: { "accept": provider.integration_type === "rss" ? "application/rss+xml, application/atom+xml, application/xml, text/xml" : "application/json", "user-agent": "GLOBALPULSE/1.0 (+https://github.com/Parthiv-Binish/GLOBALPULSE) status monitor" },
           });
           if (!result.ok) throw new Error("Status source returned HTTP " + result.status);
-          document = await result.json();
+          document = provider.integration_type === "rss" ? await result.text() : await result.json();
         } finally {
           clearTimeout(timeout);
         }
 
-        const { state, incidents } = normalize(document);
+        const { state, incidents } = provider.integration_type === "rss" ? normalizeFeed(document) : normalize(document);
         const { error: updateError } = await supabase.from("providers")
           .update({ current_status: state, last_checked_at: new Date().toISOString() })
           .eq("id", provider.id);
