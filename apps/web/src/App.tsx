@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { createClient, type Session } from '@supabase/supabase-js';
 import {
   Activity, AlertCircle, Bell, CheckCircle2, ChevronRight, CircleUserRound,
   Cloud, ExternalLink, Globe2, LayoutDashboard, LogOut, Plus, RefreshCw,
-  Search, Settings, ShieldCheck, Trash2, X
+  Search, Settings, ShieldCheck, Trash2, X, Map
 } from 'lucide-react';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -14,7 +14,8 @@ const API = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').repla
 type Provider = { id: string; name: string; slug: string; category: string; status_url: string; enabled: boolean; current_status: string | null; last_checked_at: string | null };
 type Incident = { id: string; title: string; status: string; impact: string; updated_at: string; source_url: string | null; provider_name: string; provider_id: string };
 type Profile = { id: string; display_name: string | null; role: 'user' | 'admin' };
-type Page = 'overview' | 'incidents' | 'providers' | 'alerts' | 'admin' | 'account';
+type Page = 'overview' | 'map' | 'incidents' | 'providers' | 'alerts' | 'admin' | 'account';
+const GlobalMap = lazy(() => import('./components/GlobalMap'));
 
 function time(value?: string | null) { return value ? new Date(value).toLocaleString() : 'Not yet'; }
 function safeSlug(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
@@ -244,13 +245,14 @@ export default function App() {
 
   const nav = [
     {id:'overview' as Page,label:'Overview',icon:LayoutDashboard},
+    {id:'map' as Page,label:'Global map',icon:Map},
     {id:'incidents' as Page,label:'Incidents',icon:AlertCircle},
     {id:'providers' as Page,label:'Providers',icon:Globe2},
     {id:'alerts' as Page,label:'My alerts',icon:Bell},
     ...(profile?.role==='admin'?[{id:'admin' as Page,label:'Administration',icon:Settings}]:[]),
     {id:'account' as Page,label:'Account',icon:CircleUserRound}
   ];
-  const title = ({overview:'Infrastructure overview',incidents:'Incident intelligence',providers:'Provider directory',alerts:'Your subscriptions',admin:'Provider administration',account:'Account settings'} as Record<Page,string>)[page];
+  const title = ({overview:'Infrastructure overview',map:'Global service map',incidents:'Incident intelligence',providers:'Provider directory',alerts:'Your subscriptions',admin:'Provider administration',account:'Account settings'} as Record<Page,string>)[page];
 
   return <div className="app">
     <aside className="sidebar">
@@ -270,6 +272,7 @@ export default function App() {
         </section>
         <section className="columns"><article className="panel"><div className="panelhead"><div><small>LIVE EVENT STREAM</small><h3>Recent incidents</h3></div><span>{incidents.length} EVENTS</span></div><div className="search"><Search size={16}/><input placeholder="Search incidents or providers" value={query} onChange={e=>setQuery(e.target.value)}/></div><IncidentList items={filtered.slice(0,8)} loading={loading} total={incidents.length}/></article><ProviderPanel providers={providers.slice(0,8)} subscriptions={subscriptions} onSubscribe={subscribe}/></section>
       </>}
+      {page==='map' && <Suspense fallback={<section className="panel"><div className="empty"><RefreshCw/><b>Loading interactive globe…</b></div></section>}><GlobalMap providers={providers.filter(p=>p.enabled)} incidents={incidents}/></Suspense>}
       {page==='incidents' && <section className="panel"><div className="panelhead"><div><small>PROVIDER-REPORTED EVENTS</small><h3>Incident history</h3></div><span>{filtered.length} RESULTS</span></div><div className="search"><Search size={16}/><input placeholder="Search title, provider or status" value={query} onChange={e=>setQuery(e.target.value)}/></div><IncidentList items={filtered} loading={loading} total={incidents.length}/></section>}
       {page==='providers' && <section className="panel"><div className="panelhead"><div><small>VERIFIED SOURCE DIRECTORY</small><h3>Monitored providers</h3></div><span>{providers.length} SOURCES</span></div><ProviderPanel providers={providers} subscriptions={subscriptions} onSubscribe={subscribe}/></section>}
       {page==='alerts' && <section className="panel"><div className="panelhead"><div><small>PERSONAL WATCHLIST</small><h3>Provider subscriptions</h3></div><span>{subscriptions.length} SUBSCRIBED</span></div><p className="panel-intro">Choose providers to keep in your watchlist. This version stores your preferences; email and push delivery will be activated when notification credentials and delivery policies are configured.</p>{providers.filter(p=>subscriptions.some(s=>s.provider_id===p.id)).length===0?<div className="empty"><Bell/><b>No provider subscriptions yet</b><p>Open the provider directory and subscribe to sources you want to follow.</p></div>:providers.filter(p=>subscriptions.some(s=>s.provider_id===p.id)).map(p=><div className="provider-row" key={p.id}><Globe2/><div><b>{p.name}</b><small>{p.category}</small></div><button className="secondary" onClick={()=>void subscribe(p.id)}>Unsubscribe</button></div>)}</section>}
