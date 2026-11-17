@@ -1,6 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createRemoteJWKSet, jwtVerify } from "npm:jose@5";
-import { XMLParser } from "npm:fast-xml-parser@4";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -40,19 +39,26 @@ function normalize(doc: any) {
 }
 
 
-const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_", processEntities: false });
-function asArray(value: any) { return value == null ? [] : Array.isArray(value) ? value : [value]; }
+function xmlText(value: string) {
+  return value.replace(/<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>/g, "$1")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+}
+function xmlTag(block: string, name: string) {
+  const match = block.match(new RegExp("<" + name + "(?:\\\\s[^>]*)?>([\\\\s\\S]*?)</" + name + ">", "i"));
+  return match ? xmlText(match[1]).trim() : "";
+}
 function normalizeFeed(xml: string) {
-  const parsed = xmlParser.parse(xml);
-  const feed = parsed?.rss?.channel ?? parsed?.feed ?? {};
-  const entries = asArray(feed.item ?? feed.entry);
-  const incidents = entries.map((item: any) => {
-    const title = String(item.title?.["#text"] ?? item.title ?? "Provider status update");
-    const description = String(item.description ?? item.summary ?? item.content ?? "");
+  const entries = xml.match(/<(?:item|entry)\\b[\\s\\S]*?<\\/(?:item|entry)>/gi) ?? [];
+  const incidents = entries.map((item) => {
+    const title = xmlTag(item, "title") || "Provider status update";
+    const description = xmlTag(item, "description") || xmlTag(item, "summary") || xmlTag(item, "content");
     const body = (title + " " + description).toLowerCase();
-    const rawId = item.guid?.["#text"] ?? item.guid ?? item.id ?? item.link?.["@_href"] ?? item.link;
-    const link = item.link?.["@_href"] ?? item.link ?? null;
-    const dateValue = item.pubDate ?? item.updated ?? item.published ?? new Date().toISOString();
+    const id = xmlTag(item, "guid") || xmlTag(item, "id");
+    const href = item.match(/<link\\b[^>]*href=["']([^"']+)["'][^>]*\\/?\\s*>/i)?.[1];
+    const link = href || xmlTag(item, "link") || null;
+    const dateValue = xmlTag(item, "pubDate") || xmlTag(item, "updated") ||
+      xmlTag(item, "published") || new Date().toISOString();
     const parsedDate = new Date(dateValue);
     const timestamp = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
     const status = /resolved|closed|restored|completed/.test(body) ? "resolved"
@@ -61,19 +67,18 @@ function normalizeFeed(xml: string) {
     const impact = /critical/.test(body) ? "critical" : /major|severe/.test(body) ? "major"
       : /minor|degraded/.test(body) ? "minor" : "unknown";
     return {
-      source_event_id: String(rawId ?? title + timestamp),
+      source_event_id: id || String(link || title + timestamp),
       title: title.slice(0, 500),
       status,
       impact,
-      shortlink: typeof link === "string" ? link : null,
-      source_url: typeof link === "string" ? link : null,
+      shortlink: link,
+      source_url: link,
       created_at: timestamp,
       updated_at: timestamp,
     };
   });
   return { state: "unknown", incidents };
 }
-
 Deno.serve(async (req) => {
   if (req.method !== "POST") return response({ error: "Method not allowed" }, 405);
 
