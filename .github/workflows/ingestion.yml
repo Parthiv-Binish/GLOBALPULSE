@@ -8,6 +8,7 @@ on:
       - "supabase/functions/globalpulse-ingest/**"
       - "supabase/migrations/005_verified_provider_sources.sql"
       - "supabase/migrations/006_expanded_official_sources.sql"
+      - "supabase/migrations/007_cloud_provider_feeds.sql"
   schedule:
     # Six-hour cadence keeps private-repository Actions usage within the free allowance.
     # Provider registry expanded on 2026-11-17; run once against the new allowlist.
