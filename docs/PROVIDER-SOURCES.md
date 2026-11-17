@@ -1,32 +1,45 @@
 # Official provider sources
 
-The following provider status pages publish public Statuspage-compatible JSON summary endpoints. The endpoints were checked on 17 November 2026 and are the only hosts currently allowed by the ingestion function.
+GLOBALPULSE polls public, provider-owned Statuspage-compatible JSON summary endpoints. These are vendor-reported health signals, not independent uptime probes.
 
-| Provider | Official status page | Summary endpoint |
-|---|---|---|
-| Cloudflare | https://www.cloudflarestatus.com | https://www.cloudflarestatus.com/api/v2/summary.json |
-| GitHub | https://www.githubstatus.com | https://www.githubstatus.com/api/v2/summary.json |
-| Atlassian | https://status.atlassian.com | https://status.atlassian.com/api/v2/summary.json |
-| DigitalOcean | https://status.digitalocean.com | https://status.digitalocean.com/api/v2/summary.json |
-| Twilio | https://status.twilio.com | https://status.twilio.com/api/v2/summary.json |
+## Enabled official sources
+
+| Provider | Category | Official status page | Summary API |
+|---|---|---|---|
+| Cloudflare | CDN / DNS / Edge | https://www.cloudflarestatus.com | https://www.cloudflarestatus.com/api/v2/summary.json |
+| GitHub | Developer platform | https://www.githubstatus.com | https://www.githubstatus.com/api/v2/summary.json |
+| Atlassian | SaaS / Developer tools | https://status.atlassian.com | https://status.atlassian.com/api/v2/summary.json |
+| DigitalOcean | Cloud infrastructure | https://status.digitalocean.com | https://status.digitalocean.com/api/v2/summary.json |
+| Twilio | Communications API | https://status.twilio.com | https://status.twilio.com/api/v2/summary.json |
+| OpenAI | AI platform / API | https://status.openai.com | https://status.openai.com/api/v2/summary.json |
+| Discord | Communications | https://discordstatus.com | https://discordstatus.com/api/v2/summary.json |
+| Zoom | Video communications | https://www.zoomstatus.com | https://www.zoomstatus.com/api/v2/summary.json |
+| MongoDB Atlas | Database / Data platform | https://status.mongodb.com | https://status.mongodb.com/api/v2/summary.json |
+| Supabase | Database / Developer platform | https://status.supabase.com | https://status.supabase.com/api/v2/summary.json |
+| Netlify | Hosting / Edge | https://www.netlifystatus.com | https://www.netlifystatus.com/api/v2/summary.json |
+| Akamai | CDN / Edge / Security | https://www.akamaistatus.com | https://www.akamaistatus.com/api/v2/summary.json |
+| npm | Package registry | https://status.npmjs.org | https://status.npmjs.org/api/v2/summary.json |
+| New Relic | Observability | https://status.newrelic.com | https://status.newrelic.com/api/v2/summary.json |
 
 ## Integration contract
 
-- Poll only the official summary endpoint.
-- Send a descriptive user agent.
+- Poll only the exact official summary endpoint built from a verified root status URL.
+- Send a descriptive User-Agent and use a bounded request timeout.
+- Reject unknown hosts, URL credentials, custom ports, paths, query strings, fragments, and redirects.
 - Do not call provider management APIs or submit updates to provider systems.
-- Treat source status and incident fields as provider-reported data.
-- Do not infer independent reachability, customer impact, root cause, or SLA compliance.
-- Keep the exact provider URL and source incident identifier with each record.
-- Do not follow redirects from an allowlisted host; investigate and approve host changes before updating the allowlist.
-- Respect each provider's terms and operational guidance.
+- Treat status, components, and incidents as provider-reported information.
+- Preserve provider source incident identifiers and original source URLs.
+- An inaccessible source is reported as a failed poll; it is never silently treated as operational.
+- A provider's public status page may omit service-specific or regional issues. GLOBALPULSE does not infer independent reachability, customer impact, root cause, or SLA compliance.
 
-## Verification references
+## API references and verification
 
-- Cloudflare's official API documentation: https://www.cloudflarestatus.com/api
-- GitHub's official API page: https://www.githubstatus.com/api/v2
-- Atlassian's official API page: https://status.atlassian.com/api
-- DigitalOcean's official API page: https://status.digitalocean.com/api
-- Twilio's official API page: https://status.twilio.com/api
+The following official API endpoints returned JSON during source verification on 17 November 2026: OpenAI, Discord, Zoom, MongoDB Atlas, Supabase, Netlify, Akamai, npm, and New Relic. Existing Cloudflare and Twilio API documentation explicitly describes the Statuspage JSON endpoints.
 
-An HTTP response at one point in time does not guarantee future availability. The scheduled ingestion log is the source of truth for the latest successful poll.
+- Cloudflare API documentation: https://www.cloudflarestatus.com/api
+- Twilio API documentation: https://status.twilio.com/api
+- GitHub API: https://www.githubstatus.com/api/v2
+- Atlassian API documentation: https://status.atlassian.com/api
+- DigitalOcean API documentation: https://status.digitalocean.com/api
+
+A source being reachable during verification does not guarantee future availability. The latest successful ingestion run is the operational source of truth.
