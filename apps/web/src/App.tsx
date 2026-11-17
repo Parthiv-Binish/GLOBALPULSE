@@ -41,6 +41,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [subscriptions, setSubscriptions] = useState<{id:string;provider_id:string|null;category:string|null}[]>([]);
+  const [auditLogs, setAuditLogs] = useState<{id:string;action:string;entity_type:string;created_at:string;details:Record<string,unknown>}[]>([]);
   const [providerForm, setProviderForm] = useState({name:'',category:'Cloud',status_url:''});
   const [formError, setFormError] = useState('');
   const [formMessage, setFormMessage] = useState('');
@@ -89,6 +90,12 @@ export default function App() {
     setSubscriptions(data || []);
   };
 
+  const loadAuditLogs = async () => {
+    if (!supabase || profile?.role !== 'admin') { setAuditLogs([]); return; }
+    const {data} = await supabase.from('audit_logs').select('id,action,entity_type,created_at,details').order('created_at',{ascending:false}).limit(20);
+    setAuditLogs(data || []);
+  };
+
   useEffect(() => {
     if (!authReady) return;
     void loadData();
@@ -97,8 +104,11 @@ export default function App() {
   }, [authReady]);
 
   useEffect(() => { void loadSubscriptions(); }, [session]);
+  useEffect(() => { void loadAuditLogs(); }, [profile]);
 
   const filtered = useMemo(() => incidents.filter(i => (i.title+' '+i.provider_name+' '+i.status).toLowerCase().includes(query.toLowerCase())),[incidents,query]);
+  const subscribedProviderIds = new Set(subscriptions.map(s=>s.provider_id).filter((id): id is string => Boolean(id)));
+  const watchedIncidents = incidents.filter(i=>subscribedProviderIds.has(i.provider_id));
 
   const submitAuth = async (event: React.FormEvent) => {
     event.preventDefault(); if (!supabase) return;
@@ -269,6 +279,8 @@ export default function App() {
         {showProviderForm && <form className="provider-form" onSubmit={addProvider}><label>Provider name<input required value={providerForm.name} onChange={e=>setProviderForm({...providerForm,name:e.target.value})} placeholder="Provider name"/></label><label>Category<select value={providerForm.category} onChange={e=>setProviderForm({...providerForm,category:e.target.value})}>{['Cloud','SaaS','Telecom','DNS','CDN','Internet infrastructure','Payments','Developer tools','Other'].map(v=><option key={v}>{v}</option>)}</select></label><label className="wide">Official status page URL<input required type="url" value={providerForm.status_url} onChange={e=>setProviderForm({...providerForm,status_url:e.target.value})} placeholder="https://status.example.com"/></label><div className="wide form-hint">Connector: Statuspage API v2 summary.json · HTTPS only · No credentials or custom ports</div><button className="primary" disabled={busy}>Save disabled provider</button></form>}
         {providers.length===0?<div className="empty"><Globe2/><b>Provider registry is empty</b><p>Add a real provider source to begin monitoring.</p></div>:providers.map(p=><div className="provider-row" key={p.id}><Globe2/><div><b>{p.name}</b><small>{p.category} · {p.status_url}</small></div><span className={'pill '+(p.enabled?'good':'muted')}>{p.enabled?'Enabled':'Disabled'}</span><button className="secondary" onClick={()=>void toggleProvider(p)}>{p.enabled?'Disable':'Enable'}</button><button className="danger-icon" onClick={()=>void deleteProvider(p)} title="Delete provider"><Trash2 size={15}/></button></div>)}
         <div className="integrity"><ShieldCheck/><p><b>Admin access is protected by database RLS.</b><br/>Your account must be explicitly promoted to admin by the project owner. User accounts cannot promote themselves.</p></div>
+        <div className="panelhead"><div><small>GOVERNANCE</small><h3>Recent administrator actions</h3></div><span>{auditLogs.length} RECORDS</span></div>
+        {auditLogs.length===0?<div className="empty"><ShieldCheck/><b>No admin actions recorded</b><p>Changes made through this console will appear here.</p></div>:auditLogs.map(log=><div className="audit-row" key={log.id}><div><b>{log.action}</b><small>{log.entity_type} · {time(log.created_at)}</small></div><code>{JSON.stringify(log.details || {})}</code></div>)}
       </section>}
       {page==='account' && <section className="panel account-panel"><div className="panelhead"><div><small>IDENTITY & ACCESS</small><h3>Account profile</h3></div></div><div className="account-detail"><CircleUserRound/><div><b>{profile?.display_name || 'GLOBALPULSE user'}</b><small>{session.user.email}</small><small>Role: {profile?.role || 'user'}</small></div></div><form className="profile-form" onSubmit={saveProfile}><label>Display name<input value={profileName} onChange={e=>setProfileName(e.target.value)} maxLength={80} placeholder="Your display name"/></label><button className="secondary">Save profile</button></form>{authMessage && <div className="notice">{authMessage}</div>}{authError && <div className="notice error">{authError}</div>}<div className="panel-intro">Your account is managed by Supabase Auth. Password reset is available from the sign-in screen. Account deletion removes your authentication profile and subscriptions.</div><div className="account-actions"><button className="secondary" onClick={()=>void signOut()}><LogOut size={15}/> Sign out</button><button className="danger" disabled={busy} onClick={()=>void deleteOwnAccount()}><Trash2 size={15}/> Delete account</button></div></section>}
       <footer>© {new Date().getFullYear()} GLOBALPULSE · SOURCE-ATTRIBUTED INFRASTRUCTURE INTELLIGENCE</footer>
