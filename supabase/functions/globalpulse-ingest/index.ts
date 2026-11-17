@@ -78,9 +78,28 @@ Deno.serve(async (req) => {
     for (const provider of providers ?? []) {
       try {
         const source = new URL(provider.status_url);
-        if (source.protocol !== "https:" || !source.hostname ||
-            source.hostname === "localhost" || source.hostname.endsWith(".localhost")) {
-          throw new Error("Provider URL must use a public HTTPS host");
+        const approvedHosts = new Set([
+          "www.cloudflarestatus.com",
+          "www.githubstatus.com",
+          "status.atlassian.com",
+          "status.digitalocean.com",
+          "status.twilio.com",
+          "status.openai.com",
+          "discordstatus.com",
+          "www.zoomstatus.com",
+          "status.mongodb.com",
+          "status.supabase.com",
+          "www.netlifystatus.com",
+          "www.akamaistatus.com",
+          "status.npmjs.org",
+          "status.newrelic.com",
+        ]);
+        if (
+          source.protocol !== "https:" || !approvedHosts.has(source.hostname) ||
+          source.username || source.password || source.port ||
+          source.pathname !== "/" || source.search || source.hash
+        ) {
+          throw new Error("Provider URL is not an approved official HTTPS status source");
         }
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
@@ -88,7 +107,8 @@ Deno.serve(async (req) => {
         try {
           const result = await fetch(source.toString().replace(/\/$/, "") + "/api/v2/summary.json", {
             signal: controller.signal,
-            headers: { "accept": "application/json", "user-agent": "GLOBALPULSE/1.0 status monitor" },
+            redirect: "error",
+            headers: { "accept": "application/json", "user-agent": "GLOBALPULSE/1.0 (+https://github.com/Parthiv-Binish/GLOBALPULSE) status monitor" },
           });
           if (!result.ok) throw new Error("Status source returned HTTP " + result.status);
           document = await result.json();
