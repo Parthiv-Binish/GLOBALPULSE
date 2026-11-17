@@ -43,3 +43,17 @@ The following official API endpoints returned JSON during source verification on
 - DigitalOcean API documentation: https://status.digitalocean.com/api
 
 A source being reachable during verification does not guarantee future availability. The latest successful ingestion run is the operational source of truth.
+
+## Additional cloud-provider feeds
+
+These providers publish official RSS/Atom incident feeds rather than the same JSON summary contract. GLOBALPULSE stores their feed items as source-attributed incident updates. Their aggregate status is deliberately shown as **unknown** because a history feed alone cannot prove that every service is operational.
+
+| Provider | Official feed | Format |
+|---|---|---|
+| Amazon Web Services | https://status.aws.amazon.com/rss/all.rss | RSS |
+| Google Cloud | https://status.cloud.google.com/en/feed.atom | Atom |
+| Microsoft Azure | https://azure.status.microsoft/status/feed/ | RSS |
+| IBM Cloud | https://cloud.ibm.com/status/api/notifications/feed.rss | RSS |
+| Oracle Cloud Infrastructure | https://ocistatus.oraclecloud.com/api/v2/incident-summary.rss | RSS |
+
+Coverage caveats: AWS recommends EventBridge for account-specific AWS Health events; the public RSS feed is only a broad public signal. Azure's public status feed is not a substitute for personalized Azure Service Health. IBM notes that some maintenance and account-scoped incidents are not included in its public feed. Google Cloud's public feed covers incidents posted to its public Service Health dashboard.
