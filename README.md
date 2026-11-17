@@ -82,7 +82,7 @@ Migrations are applied in numeric order and tracked in the repository. The initi
 
 - Subscriptions currently store an in-app watchlist; outbound email, SMS, and push notifications are not enabled.
 - Only the five explicitly allowlisted Statuspage-compatible official sources are supported in this release.
-- A self-service account deletion screen, privacy/grievance contact details, independent uptime probes, RSS connectors, and multi-tenant enterprise administration are not yet available.
+- Privacy/grievance contact details and legal review remain owner actions. Independent uptime probes, RSS connectors, outbound email/push notifications, and multi-tenant enterprise administration are not yet available.
 - The privacy notice is a draft and must be reviewed before public launch.
 
 See `docs/ENTERPRISE-HANDBOOK.md` for the delivery lifecycle and release gates.
