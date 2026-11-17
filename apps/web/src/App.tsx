@@ -128,7 +128,7 @@ export default function App() {
     if (!supabase || !session?.user) return;
     const {error} = await supabase.from('profiles').update({display_name:profileName.trim()}).eq('id',session.user.id);
     if (error) setAuthError(error.message);
-    else { setProfile({...profile!,display_name:profileName.trim()}); setAuthMessage('Profile updated.'); }
+    else { setProfile({id:session.user.id,display_name:profileName.trim(),role:profile?.role || 'user'}); setAuthMessage('Profile updated.'); }
   };
 
   const deleteOwnAccount = async () => {
