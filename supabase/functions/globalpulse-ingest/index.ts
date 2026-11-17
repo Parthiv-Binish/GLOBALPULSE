@@ -40,7 +40,7 @@ function normalize(doc: any) {
 }
 
 
-const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_", processEntities: false });
 function asArray(value: any) { return value == null ? [] : Array.isArray(value) ? value : [value]; }
 function normalizeFeed(xml: string) {
   const parsed = xmlParser.parse(xml);
