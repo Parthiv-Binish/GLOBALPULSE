@@ -24,7 +24,7 @@ Function: `supabase/functions/globalpulse-ingest/index.ts`
 - Uses GitHub's short-lived OIDC identity token; no long-lived Supabase service key is stored in GitHub.
 - The Edge Function verifies issuer, audience, repository, branch, and exact workflow identity before starting ingestion.
 - The Edge Function uses Supabase's server-side environment key; it is never exposed to the browser or committed to the repository.
-- The worker only reads enabled Statuspage-compatible providers from the database. No provider records are seeded.
+- The ingestion function reads only enabled provider records. The initial five source records are real official provider endpoints documented in `docs/PROVIDER-SOURCES.md`; no sample incidents or synthetic events are seeded. The function enforces an exact hostname allowlist and rejects redirects.
 
 ## Free-tier limitations and operational controls
 
